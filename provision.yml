@@ -1,0 +1,92 @@
+---
+
+- name: provision wsl environment
+  hosts: localhost
+  connection: local
+  vars:
+    win_drives:
+    - c
+    - d
+    - e
+    profile_drive: d
+    wsl_user: '{{ ansible_env.LOGNAME }}'
+    wsltty_items:
+    - url: 'https://raw.githubusercontent.com/mavnn/mintty-colors-solarized/master/.minttyrc.dark'
+      dest: /mnt/{{ profile_drivename }}/Users/{{ wsl_user }}/AppData/Roaming/wsltty/themes/solarized_dark
+    - url: 'https://maoudamashii.jokersounds.com/music/se/wav/se_maoudamashii_system41.wav'
+      dest: /mnt/{{ profile_drivename }}/Users/{{ wsl_user }}/AppData/Roaming/wsltty/sounds/beep.wav
+    wsl_conf: |-
+      [automount]
+      enabled = false
+      mountFsTab = true
+    timezone: |
+      Asia/Tokyo
+
+  tasks:
+  - name: superuser tasks
+    block:
+    - name: aptitude added
+      package: >
+        name=aptitude
+
+    - name: repositories added
+      apt_repository: >
+        repo={{ item }}
+      loop:
+      - 'ppa:fish-shell/release-2'
+      - 'ppa:neovim-ppa/unstable'
+
+    - name: packages installed
+      package: >
+        name={{ item }}
+      loop:
+      - language-pack-ja
+      - rsync
+      - fish
+      - neovim
+
+    - name: python neovim packages installed
+      pip: >
+        name=neovim
+        executable={{ item }}
+      loop:
+      - pip3
+      - pip2
+
+    - name: default locale set to ja
+      command: update-locale LANG=ja_JP.UTF8
+      when: ansible_env.LANG|default("") != "ja_JP.UTF8"
+
+    - name: timezone file configured
+      copy: >
+        dest=/etc/timezone
+        content={{ timezone }}
+      register: _timezone
+
+    - name: timezone configured
+      command: dpkg-reconfigure --frontend noninteractive tzdata
+      when: _timezone is changed
+  
+    - name: all win drives in fstab update to support metadata
+      mount: >
+        path=/mnt/{{ item }}
+        src='{{ item }}:'
+        fstype=drvfs
+        opts='metadata,umask=22,fmask=11,uid=1000,gid=1000'
+        state=present
+      register: _mount
+      loop: '{{ win_drives }}'
+    - debug: var=_mount verbosity=1
+
+    become: yes
+
+  - name: archiving current home if not mounted
+    shell: |
+      mountpoint /home/{{ wsl_user }} ||
+      tar cfz /tmp/{{ wsl_user }}.tar.gz -C /home/{{ wsl_user }} .
+    register: _mountpoint
+    changed_when: _mountpoint.stderr.find("is not") > -1
+    failed_when: _mountpoint.rc not in [0, 1]
+      
+  - name: promt "Restart Console"
+    debug: msg="Exit all wsl console, Login again and Execute provision_user.yml"

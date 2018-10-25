@@ -1,0 +1,26 @@
+---
+
+- name: provision wsl environment
+  hosts: localhost
+  connection: local
+  vars:
+    profile_drivename: d
+    wsl_user: '{{ ansible_env.LOGNAME }}'
+  tasks:
+    - name: dir for wsl home created
+      file: >
+        path=/mnt/{{ profile_drive }}/Users/{{ wsl_user }}/wslhome
+        state=directory
+        owner={{ wsl_user }}
+        group={{ wsl_user }}
+    
+    - name: user home in fstab updated for bind mount in fstab
+      mount: >
+        path=/home/{{ wsl_user }}
+        src=/mnt/{{ profile_drive }}/Users/{{ wsl_user }}/wslhome
+        fstype=none
+        opts=bind
+        state=present
+      register: _mount
+    - debug: var=_mount verbosity=1
+

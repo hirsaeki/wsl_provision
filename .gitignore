@@ -1,0 +1,5 @@
+*.retry
+*.zip
+*.tar.gz
+*.tar.bz
+*.tar.xz
