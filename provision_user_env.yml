@@ -1,0 +1,170 @@
+---
+# vim: set ft=yaml.ansible :
+- name: provision shell and environment
+  hosts: localhost
+  connection: local
+  vars:
+    win_temp: >-
+      {{ lookup('pipe', 'cmd.exe /c "echo %TEMP%"') }}
+    win_appdata: >-
+      {{ lookup('pipe', 'cmd.exe /c "echo %APPDATA%"') }}
+    win_userprofile: >-
+      {{ lookup('pipe', 'cmd.exe /c "echo %USERPROFILE%"') }}
+    win_localappdata: >-
+      {{ lookup('pipe', 'cmd.exe /c "echo %LOCALAPPDATA%"') }}
+    wsl_userprofile: >-
+      {{ lookup('pipe', 'wslpath -a "%s"' % win_userprofile) }}
+    wsl_localappdata: >-
+      {{ lookup('pipe', 'wslpath -a "%s"' % win_localappdata) }}
+    handy_apps_root: '{{ wsl_userprofile }}/opt'
+    papp_data_path: '{{ handy_apps_root }}/portableAppsPlatform/PortableApps/PortableApps.com/Data' 
+    win_startup: '{{ win_appdata }}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup'
+    handy_apps:
+    - src: https://github.com/nathancorvussolis/crvskkserv/releases/download/2.2.0/crvskkserv-2.2.0.zip 
+      name: crvskkserv
+    - src: https://portableapps.com/redirect/?a=PortableApps.comPlatform&s=s&d=pa&f=PortableApps.com_Platform_Setup_15.0.2.paf.exe
+      name: portableAppsPlatform
+      executable: Start.exe
+    proxy_env:
+      http_proxy: http://150.67.140.80:3128
+      https_proxy: http://150.67.140.80:3128
+    confhome: '{{ ansible_env.XGD_CONFIG_HOME|default("~/.config") }}'
+    confs_from_git:
+    - repo: https://github.com/mavnn/mintty-colors-solarized
+      dest: mintty/solarized
+    - repo: https://github.com/seebi/dircolors-solarized
+      dest: dircolors/solarized
+    config_fish: |-
+      source {{ confhome }}/mintty/solarized/sol.dark
+      eval (dircolors -c {{ confhome }}/dircolors/solarized/dircolors.256dark)
+      alias vi=nvim
+      alias vim=nvim
+      stty stop undef
+      stty start undef
+    font_sources:
+    - https://github.com/mzyy94/RictyDiminished-for-Powerline/blob/master/powerline-fontpatched/Ricty Diminished Bold Oblique for Powerline.ttf
+    - https://github.com/mzyy94/RictyDiminished-for-Powerline/blob/master/powerline-fontpatched/Ricty Diminished Bold for Powerline.ttf
+    - https://github.com/mzyy94/RictyDiminished-for-Powerline/blob/master/powerline-fontpatched/Ricty Diminished Discord Bold Oblique for Powerline.ttf
+    - https://github.com/mzyy94/RictyDiminished-for-Powerline/blob/master/powerline-fontpatched/Ricty Diminished Discord Bold for Powerline.ttf
+    - https://github.com/mzyy94/RictyDiminished-for-Powerline/blob/master/powerline-fontpatched/Ricty Diminished Discord Oblique for Powerline.ttf
+    - https://github.com/mzyy94/RictyDiminished-for-Powerline/blob/master/powerline-fontpatched/Ricty Diminished Discord Regular for Powerline.ttf
+    - https://github.com/mzyy94/RictyDiminished-for-Powerline/blob/master/powerline-fontpatched/Ricty Diminished Oblique for Powerline.ttf
+    - https://github.com/mzyy94/RictyDiminished-for-Powerline/blob/master/powerline-fontpatched/Ricty Diminished Regular for Powerline.ttf
+    shortcut_ps: >
+      powershell.exe -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command '
+      $wsh = New-Object -ComObject WScript.Shell;
+      $link = $wsh.CreateShortcut("%(sc_linkname)s.lnk");
+      $link.Arguments = "%(sc_args)s";
+      $link.TargetPath = "%(sc_target)s";
+      $link.Save();'
+
+  tasks:
+  - name: install fisher
+    shell: >
+      executable=/usr/bin/fish
+      creates={{ confhome }}/fish/functions/fisher.fish
+      curl https://git.io/fisher --create-dirs -sLo {{ confhome }}/fish/functions/fisher.fish; and
+      fisher up
+    environment: '{{ proxy_env }}'
+
+  - name: install agnoster
+    shell: >
+      creates={{ confhome }}/fisher/github.com/hauleth/agnoster/README.md
+      executable=/usr/bin/fish
+      fisher add hauleth/agnoster
+    environment: '{{ proxy_env }}'
+
+  - name: xdg config dirs created
+    file: >
+      path={{ confhome }}/{{ item.dest }}
+      state=directory
+    loop: '{{ confs_from_git }}'
+
+  - name: color schemes cloned
+    git: >
+      dest={{ confhome }}/{{ item.dest }}
+      repo={{ item.repo }}
+    environment: '{{ proxy_env }}'
+    loop: '{{ confs_from_git }}'
+
+  - name: prepare config.fish
+    copy: >
+      dest={{ confhome }}/fish/config.fish
+      content={{ config_fish }}
+
+  - name: handy apps folder created
+    shell: >
+      creates={{ handy_apps_root }}/{{ item.name }}
+      cmd.exe /c 'mkdir {{ win_userprofile }}\opt\{{ item.name }}'
+    loop: '{{ handy_apps }}'
+
+  - name: handy apps installed
+    unarchive: >
+      src={{ item.src }}
+      dest={{ handy_apps_root }}/{{ item.name }}
+      remote_src=yes
+    environment: '{{ proxy_env }}'
+    when: item.src is search("(\.zip$|\.tar.gz)")
+    loop: '{{ handy_apps }}'
+
+  - name: handy_apps downloaded
+    get_url: >
+      url={{ item.src }}
+      dest={{ lookup('pipe', 'wslpath "%s"' % win_temp) }}
+    register: _get
+    environment: '{{ proxy_env }}'
+    when: item.src is not search("(\.zip$|\.tar.gz)")
+    loop: '{{ handy_apps }}'
+  - debug: var=_get verbosity=1
+
+  - name: handy_apps extracted
+    shell: >
+      creates={{ handy_apps_root }}/{{ item.item.name }}/{{ item.item.executable|default(item.item.name ~ ".exe") }}
+      chdir={{ handy_apps_root }}/{{ item.item.name }}
+      7z.exe x "{{ lookup('pipe', 'wslpath -w "%s"' % item.dest) }}" -y
+    loop: '{{ _get|json_query("results[?skipped!=`true`]") }}'
+
+  - name: handy apps src deleted
+    file: >
+      path={{ item }}
+      state=absent
+    loop: '{{ _get|json_query("results[?skipped!=`true`].dest") }}'
+
+  - name: shortcut added to start menu
+    shell: >
+      creates={{ lookup('pipe', 'wslpath "%s"' % win_startup) }}/{{ item.name }}
+      {{ shortcut_ps % shortcut_args }}
+    vars:
+      shortcut_args:
+        sc_linkname: '{{ win_startup ~ "\\" ~ item.name }}'
+        sc_args: '{{ item.args|default("") }}'
+        sc_target: '{{ win_userprofile ~ "\\opt\\" ~ item.name ~ "\\" ~ (item.executable|default(item.name ~ ".exe")) }}'
+    loop: '{{ handy_apps }}'
+      
+  - name: Fonts dir created
+    shell: >
+      creates={{ papp_data_path }}/Fonts
+      cmd.exe /c 'mkdir {{ winpath }}'
+    register: _r
+    vars:
+      winpath: >-
+        {{ lookup('pipe', 'wslpath -w "%s/Fonts"' % papp_data_path) }}
+  - debug: var=_r verbosity=1
+
+  - name: download fonts
+    get_url: >
+      dest={{ papp_data_path }}/Fonts/{{ item|urlsplit('path')|basename }}
+      url={{ item|replace(" ", "%20") }}?raw=true
+    loop: '{{ font_sources }}'
+    register: _font
+    environment: '{{ proxy_env }}'
+    until: _font is succeeded
+  - debug: var=_font verbosity=1
+
+  - name: hide portableApps taskbar icon
+    ini_file: >
+      section=DisplayOptions
+      path={{ papp_data_path }}/PortableAppsMenu.ini
+      option=Windows7TaskbarIcon
+      no_extra_spaces=yes
+      value='false'
