@@ -8,23 +8,32 @@
       {{ lookup('pipe', 'cmd.exe /c "echo %TEMP%"') }}
     win_appdata: >-
       {{ lookup('pipe', 'cmd.exe /c "echo %APPDATA%"') }}
+    win_programs: '{{ win_appdata }}\Microsoft\Windows\Start Menu\Programs'
+    win_startup: '{{ win_programs }}\Startup'
+    win_handyapps_startmenu: '{{ win_programs }}\Local Apps'
     win_userprofile: >-
       {{ lookup('pipe', 'cmd.exe /c "echo %USERPROFILE%"') }}
-    win_localappdata: >-
-      {{ lookup('pipe', 'cmd.exe /c "echo %LOCALAPPDATA%"') }}
-    wsl_userprofile: >-
-      {{ lookup('pipe', 'wslpath -a "%s"' % win_userprofile) }}
-    wsl_localappdata: >-
-      {{ lookup('pipe', 'wslpath -a "%s"' % win_localappdata) }}
-    handy_apps_root: '{{ wsl_userprofile }}/opt'
-    papp_data_path: '{{ handy_apps_root }}/portableAppsPlatform/PortableApps/PortableApps.com/Data' 
-    win_startup: '{{ win_appdata }}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup'
+    win_handyapps_root: '{{ win_userprofile }}\opt'
     handy_apps:
     - src: https://github.com/nathancorvussolis/crvskkserv/releases/download/2.2.0/crvskkserv-2.2.0.zip 
       name: crvskkserv
+      startup: yes
     - src: https://portableapps.com/redirect/?a=PortableApps.comPlatform&s=s&d=pa&f=PortableApps.com_Platform_Setup_15.0.2.paf.exe
       name: portableAppsPlatform
       executable: Start.exe
+      startup: yes
+    - src: https://ja.osdn.net/frs/redir.php?m=jaist&f=yamy%2F43637%2Fyamy-0.03.zip
+      name: yamy
+      startup: yes
+    - src: https://download.sysinternals.com/files/ProcessExplorer.zip
+      name: ProcessExplorer
+      executable: procexp64.exe
+    papp_data_path: >-
+      {{ lookup('pipe', 'wslpath "%s"' % win_handyapps_root)}}/portableAppsPlatform/PortableApps/PortableApps.com/Data
+    wsl_userprofile: >-
+      {{ lookup('pipe', 'wslpath "%s"' % win_userprofile) }}
+    wsl_handyapps_root: >-
+      {{ lookup('pipe', 'wslpath "%s"' % win_handyapps_root) }}
     proxy_env:
       http_proxy: http://150.67.140.80:3128
       https_proxy: http://150.67.140.80:3128
@@ -57,6 +66,11 @@
       $link.Arguments = "%(sc_args)s";
       $link.TargetPath = "%(sc_target)s";
       $link.Save();'
+    skkdict_sources:
+    - http://openlab.jp/skk/dic/SKK-JISYO.L.gz
+    - http://openlab.jp/skk/dic/SKK-JISYO.JIS3_4.gz
+    - http://openlab.jp/skk/dic/SKK-JISYO.JIS2004.gz
+    - http://d.hatena.ne.jp/images/keyword/keywordlist_furigana.csv
 
   tasks:
   - name: install fisher
@@ -92,16 +106,40 @@
       dest={{ confhome }}/fish/config.fish
       content={{ config_fish }}
 
+  - name: local bin dir created
+    file: >
+      path=~/bin
+      state=directory
+      mode=0755
+
+  - name: user executable added to path
+    shell: >
+      executable=/usr/bin/fish
+      if contains /home/{{ ansible_env.LOGNAME }}/bin $fish_user_paths
+        echo ""
+      else
+        set -U fish_user_paths ~/bin $fish_user_paths
+        echo "changed"
+      end
+    register: _r
+    changed_when: _r.stdout.find("changed") > -1
+  - debug: var=_r verbosity=1
+
   - name: handy apps folder created
     shell: >
-      creates={{ handy_apps_root }}/{{ item.name }}
-      cmd.exe /c 'mkdir {{ win_userprofile }}\opt\{{ item.name }}'
+      creates={{ lookup('pipe', 'wslpath "%s"' % win_handyapps_root) }}/{{ item.name }}
+      cmd.exe /c 'mkdir {{ win_handyapps_root }}\{{ item.name }}'
     loop: '{{ handy_apps }}'
+
+  - name: handy apps start menu folder created
+    shell: >
+      creates={{ lookup('pipe', 'wslpath "%s"' % win_handyapps_startmenu) }} 
+      cmd.exe /c 'mkdir {{ win_handyapps_startmenu }}'
 
   - name: handy apps installed
     unarchive: >
       src={{ item.src }}
-      dest={{ handy_apps_root }}/{{ item.name }}
+      dest={{ wsl_handyapps_root }}/{{ item.name }}
       remote_src=yes
     environment: '{{ proxy_env }}'
     when: item.src is search("(\.zip$|\.tar.gz)")
@@ -113,33 +151,41 @@
       dest={{ lookup('pipe', 'wslpath "%s"' % win_temp) }}
     register: _get
     environment: '{{ proxy_env }}'
-    when: item.src is not search("(\.zip$|\.tar.gz)")
+    when: item.src is not search("(\.zip$|\.tar.gz$)")
     loop: '{{ handy_apps }}'
   - debug: var=_get verbosity=1
 
   - name: handy_apps extracted
     shell: >
-      creates={{ handy_apps_root }}/{{ item.item.name }}/{{ item.item.executable|default(item.item.name ~ ".exe") }}
-      chdir={{ handy_apps_root }}/{{ item.item.name }}
+      creates={{ handy_app_dir }}/{{ item.item.executable|default(item.item.name ~ ".exe") }}
+      chdir={{ handy_app_dir }}
       7z.exe x "{{ lookup('pipe', 'wslpath -w "%s"' % item.dest) }}" -y
-    loop: '{{ _get|json_query("results[?skipped!=`true`]") }}'
-
-  - name: handy apps src deleted
-    file: >
-      path={{ item }}
-      state=absent
-    loop: '{{ _get|json_query("results[?skipped!=`true`].dest") }}'
+    vars:
+      handy_app_dir: >-
+        {{ lookup('pipe', 'wslpath %s' % win_handyapps_root) }}/{{ item.item.name }}
+    loop: '{{ _get|json_query("results[?changed]") }}'
 
   - name: shortcut added to start menu
+    shell: >
+      creates={{ lookup('pipe', 'wslpath "%s"' % win_handyapps_startmenu) }}/{{ item.name }}
+      {{ shortcut_ps % shortcut_args }}
+    vars:
+      shortcut_args:
+        sc_linkname: '{{ win_handyapps_startmenu }}\{{ item.name }}'
+        sc_args: '{{ item.args|default("") }}'
+        sc_target: '{{ win_handyapps_root }}\{{ item.name }}\{{ item.executable|default(item.name ~ ".exe") }}'
+    loop: '{{ handy_apps }}'
+
+  - name: shortcut added to startup
     shell: >
       creates={{ lookup('pipe', 'wslpath "%s"' % win_startup) }}/{{ item.name }}
       {{ shortcut_ps % shortcut_args }}
     vars:
       shortcut_args:
-        sc_linkname: '{{ win_startup ~ "\\" ~ item.name }}'
+        sc_linkname: '{{ win_startup }}\\{{ item.name }}'
         sc_args: '{{ item.args|default("") }}'
-        sc_target: '{{ win_userprofile ~ "\\opt\\" ~ item.name ~ "\\" ~ (item.executable|default(item.name ~ ".exe")) }}'
-    loop: '{{ handy_apps }}'
+        sc_target: '{{ win_handyapps_root }}\\{{ item.name }}\\{{ item.executable|default(item.name ~ ".exe") }}'
+    loop: '{{ handy_apps|json_query("[?startup]") }}'
       
   - name: Fonts dir created
     shell: >
@@ -161,10 +207,53 @@
     until: _font is succeeded
   - debug: var=_font verbosity=1
 
-  - name: hide portableApps taskbar icon
+  - name: portableApps ini updated for taskbar icon hiding
     ini_file: >
       section=DisplayOptions
       path={{ papp_data_path }}/PortableAppsMenu.ini
       option=Windows7TaskbarIcon
       no_extra_spaces=yes
       value='false'
+
+  - name: skk dict dir created
+    shell: >
+      creates={{ wsl_userprofile }}/SKKDICT
+      cmd.exe /c 'mkdir {{ win_userprofile }}\SKKDICT'
+    register: _r
+  - debug: var=_r verbosity=1
+
+  - name: download dicts
+    get_url: >
+      dest={{ wsl_userprofile }}/SKKDICT/{{ item|urlsplit('path')|basename }}
+      url={{ item|replace(" ", "%20") }}
+    loop: '{{ skkdict_sources }}'
+    register: _skkdict
+    environment: '{{ proxy_env }}'
+    until: _skkdict is succeeded
+  - debug: var=_skkdict verbosity=1
+
+  - name: ruby script for hatena skk placed
+    copy: >
+      dest={{ wsl_userprofile }}/SKKDICT
+      src=hatena_skk.rb
+      force=no
+      mode=0755
+    register: _copy
+  - debug: var=_copy verbosity=1
+
+  - name: skk utf8 dict created
+    shell: >
+      zcat {{ item }} | nkf -w -Lu > {{ item|regex_replace("\.gz$", "") }}.utf8
+    loop: '{{ _skkdict|json_query("results[?changed].dest") }}'
+    when:
+    - item is search("\.gz$")
+
+  - name: skk utf8 hatena dict created
+    shell: >
+      chdir={{ wsl_userprofile }}/SKKDICT
+      ruby.exe {{ _copy.src|basename }} {{ item|basename }} | nkf -w -Lu > tmp.dict.utf8 &&
+      skkdic-expr2 -o {{ item|basename|regex_replace("\.csv", "") }}.utf8 tmp.dict.utf8 && 
+      rm tmp.dict.utf8
+    loop: '{{ _skkdict|json_query("results[?changed].dest") }}'
+    when:
+    - item is search("\.csv$")
