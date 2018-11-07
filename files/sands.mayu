@@ -1,0 +1,3 @@
+keymap global
+mod shift += !!Space
+key R-*Space = &Ignore

@@ -1,0 +1,20 @@
+# Terminal/Vim {{{
+keymap Terminal : Global
+  # IL: IME on
+  # IC: IME inserting
+  key IL-~IC-Esc = $ToggleIME Esc # Make IME off, Exit insert mode
+  key IC-Esc = Esc # Stop inserting
+  key IL-~IC-C-LeftSquareBracket = $ToggleIME Esc # Make IME off, Exit insert mode
+  key IC-C-LeftSquareBracket = Esc # Stop inserting
+keymap Global
+#}}}
+
+# For wsltty {{{
+window nvim /mintty\.exe/ : Terminal
+# }}}
+
+# For vscode {{{
+window vscode /Code\.exe/ : Terminal
+# }}}
+
+keymap Global
