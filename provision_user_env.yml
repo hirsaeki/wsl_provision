@@ -115,14 +115,9 @@
   - name: user executable added to path
     shell: >
       executable=/usr/bin/fish
-      if contains /home/{{ ansible_env.LOGNAME }}/bin $fish_user_paths
-        echo ""
-      else
-        set -U fish_user_paths ~/bin $fish_user_paths
-        echo "changed"
-      end
+      contains /home/{{ ansible_env.LOGNAME }}/bin $fish_user_paths; or set -U fish_user_paths ~/bin $fish_user_paths
     register: _r
-    changed_when: _r.stdout.find("changed") > -1
+    changed_when: no
   - debug: var=_r verbosity=1
 
   - name: handy apps folder created
@@ -167,9 +162,11 @@
 
   - name: shortcut added to start menu
     shell: >
-      creates={{ lookup('pipe', 'wslpath "%s"' % win_handyapps_startmenu) }}/{{ item.name }}
+      creates='{{ creates }}'
       {{ shortcut_ps % shortcut_args }}
     vars:
+      creates: >-
+        {{ lookup('pipe', 'wslpath "%s"' % win_handyapps_startmenu) }}/{{ item.name }}.lnk
       shortcut_args:
         sc_linkname: '{{ win_handyapps_startmenu }}\{{ item.name }}'
         sc_args: '{{ item.args|default("") }}'
@@ -178,9 +175,11 @@
 
   - name: shortcut added to startup
     shell: >
-      creates={{ lookup('pipe', 'wslpath "%s"' % win_startup) }}/{{ item.name }}
+      creates='{{ creates }}'
       {{ shortcut_ps % shortcut_args }}
     vars:
+      creates: >-
+        {{ lookup('pipe', 'wslpath "%s"' % win_startup) }}/{{ item.name }}.lnk
       shortcut_args:
         sc_linkname: '{{ win_startup }}\\{{ item.name }}'
         sc_args: '{{ item.args|default("") }}'
