@@ -14,6 +14,7 @@
     win_userprofile: >-
       {{ lookup('pipe', 'cmd.exe /c "echo %USERPROFILE%"') }}
     win_handyapps_root: '{{ win_userprofile }}\opt'
+    
     handy_apps:
     - src: https://github.com/nathancorvussolis/crvskkserv/releases/download/2.2.0/crvskkserv-2.2.0.zip 
       name: crvskkserv
@@ -28,6 +29,9 @@
     - src: https://download.sysinternals.com/files/ProcessExplorer.zip
       name: ProcessExplorer
       executable: procexp64.exe
+    - src: https://ftp.postgresql.org/pub/odbc/versions/dll/psqlodbc_10_03_0000-x64.zip
+      name: psqlodbc64
+      reg_startmenu: no
     papp_data_path: >-
       {{ lookup('pipe', 'wslpath "%s"' % win_handyapps_root)}}/portableAppsPlatform/PortableApps/PortableApps.com/Data
     wsl_userprofile: >-
@@ -68,8 +72,6 @@
       $link.Save();'
     skkdict_sources:
     - http://openlab.jp/skk/dic/SKK-JISYO.L.gz
-    - http://openlab.jp/skk/dic/SKK-JISYO.JIS3_4.gz
-    - http://openlab.jp/skk/dic/SKK-JISYO.JIS2004.gz
     - http://d.hatena.ne.jp/images/keyword/keywordlist_furigana.csv
 
   tasks:
@@ -171,7 +173,7 @@
         sc_linkname: '{{ win_handyapps_startmenu }}\{{ item.name }}'
         sc_args: '{{ item.args|default("") }}'
         sc_target: '{{ win_handyapps_root }}\{{ item.name }}\{{ item.executable|default(item.name ~ ".exe") }}'
-    loop: '{{ handy_apps }}'
+    loop: '{{ handy_apps|json_query("[?reg_startmenu!=`false`]") }}'
 
   - name: shortcut added to startup
     shell: >
@@ -250,9 +252,19 @@
   - name: skk utf8 hatena dict created
     shell: >
       chdir={{ wsl_userprofile }}/SKKDICT
-      ruby.exe {{ _copy.src|basename }} {{ item|basename }} | nkf -w -Lu > tmp.dict.utf8 &&
-      skkdic-expr2 -o {{ item|basename|regex_replace("\.csv", "") }}.utf8 tmp.dict.utf8 && 
-      rm tmp.dict.utf8
+      ruby.exe {{ _copy.src|basename }} {{ item|basename }} | nkf -w -Lu > SKK-JISYO.hatena.utf8
     loop: '{{ _skkdict|json_query("results[?changed].dest") }}'
     when:
     - item is search("\.csv$")
+
+  - name: skk dicts merged and sorted
+    shell: >
+      chdir={{ wsl_userprofile }}/SKKDICT
+      skkdic-expr2 -o SKK-JISYO.utf8.union {{ lookup('pipe', 'echo *.utf8').split()|join(" + ") }}
+    when: _skkdict is changed
+
+  - name: skk kana maps copied
+    copy: >
+      dest={{ wsl_userprofile }}/SKKDICT
+      src={{ item }}
+    loop: '{{ lookup("fileglob", "files/skk*.txt", wantlist=True) }}'
