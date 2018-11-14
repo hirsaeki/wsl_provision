@@ -6,15 +6,17 @@
   vars:
     win_temp: >-
       {{ lookup('pipe', 'cmd.exe /c "echo %TEMP%"') }}
-    win_appdata: >-
-      {{ lookup('pipe', 'cmd.exe /c "echo %APPDATA%"') }}
+    win_appdata: '{{ ansible_env.APPDATA }}'
     win_programs: '{{ win_appdata }}\Microsoft\Windows\Start Menu\Programs'
     win_startup: '{{ win_programs }}\Startup'
     win_handyapps_startmenu: '{{ win_programs }}\Local Apps'
     win_userprofile: >-
       {{ lookup('pipe', 'cmd.exe /c "echo %USERPROFILE%"') }}
     win_handyapps_root: '{{ win_userprofile }}\opt'
-    
+    proxy_env: {}
+    __proxy_env:
+      http_proxy: http://150.67.140.80:3128
+      https_proxy: http://150.67.140.80:3128
     handy_apps:
     - src: https://github.com/nathancorvussolis/crvskkserv/releases/download/2.2.0/crvskkserv-2.2.0.zip 
       name: crvskkserv
@@ -38,9 +40,6 @@
       {{ lookup('pipe', 'wslpath "%s"' % win_userprofile) }}
     wsl_handyapps_root: >-
       {{ lookup('pipe', 'wslpath "%s"' % win_handyapps_root) }}
-    proxy_env:
-      http_proxy: http://150.67.140.80:3128
-      https_proxy: http://150.67.140.80:3128
     confhome: '{{ ansible_env.XGD_CONFIG_HOME|default("~/.config") }}'
     confs_from_git:
     - repo: https://github.com/mavnn/mintty-colors-solarized
@@ -125,13 +124,13 @@
   - name: handy apps folder created
     shell: >
       creates={{ lookup('pipe', 'wslpath "%s"' % win_handyapps_root) }}/{{ item.name }}
-      cmd.exe /c 'mkdir {{ win_handyapps_root }}\{{ item.name }}'
+      cmd.exe /c 'mkdir' '{{ win_handyapps_root }}\{{ item.name }}'
     loop: '{{ handy_apps }}'
 
   - name: handy apps start menu folder created
     shell: >
-      creates={{ lookup('pipe', 'wslpath "%s"' % win_handyapps_startmenu) }} 
-      cmd.exe /c 'mkdir {{ win_handyapps_startmenu }}'
+      creates={{ lookup('pipe', 'wslpath "%s"' % win_handyapps_startmenu) }}
+      cmd.exe /c 'mkdir' '{{ win_handyapps_startmenu }}'
 
   - name: handy apps installed
     unarchive: >
@@ -150,7 +149,6 @@
     environment: '{{ proxy_env }}'
     when: item.src is not search("(\.zip$|\.tar.gz$)")
     loop: '{{ handy_apps }}'
-  - debug: var=_get verbosity=1
 
   - name: handy_apps extracted
     shell: >
@@ -159,8 +157,8 @@
       7z.exe x "{{ lookup('pipe', 'wslpath -w "%s"' % item.dest) }}" -y
     vars:
       handy_app_dir: >-
-        {{ lookup('pipe', 'wslpath %s' % win_handyapps_root) }}/{{ item.item.name }}
-    loop: '{{ _get|json_query("results[?changed]") }}'
+        {{ lookup('pipe', 'wslpath "%s"' % win_handyapps_root) }}/{{ item.item.name }}
+    loop: '{{ _get|json_query("results[?dest!=`null`]") }}'
 
   - name: shortcut added to start menu
     shell: >
@@ -191,7 +189,7 @@
   - name: Fonts dir created
     shell: >
       creates={{ papp_data_path }}/Fonts
-      cmd.exe /c 'mkdir {{ winpath }}'
+      cmd.exe /c 'mkdir' '{{ winpath }}'
     register: _r
     vars:
       winpath: >-

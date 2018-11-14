@@ -4,23 +4,23 @@
   hosts: localhost
   connection: local
   vars:
-    proxy_env:
+    use_proxy: no
+    proxy_env: {}
+    __proxy_env:
       http_proxy: http://150.67.140.80:3128
       https_proxy: http://150.67.140.80:3128
       APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE: DontWarn
-    win_drives:
-    - c
-    profile_drive: c
+    win_drives: '{{ lookup("pipe", "mount | awk ''/^[a-z]:/ {print $1}'' | sort | uniq").splitlines() }}'
+    wsl_appdata: '{{ lookup("pipe", "wslpath \"%s\"" % ansible_env.APPDATA) }}'
     wsl_user: '{{ ansible_env.LOGNAME }}'
-    win_user: '04351'
     ppas:
     - ppa:fish-shell/release-2
     - ppa:neovim-ppa/unstable
     wsltty_items:
     - url: 'https://raw.githubusercontent.com/mavnn/mintty-colors-solarized/master/.minttyrc.dark'
-      dest: /mnt/{{ profile_drivename }}/Users/{{ win_user }}/AppData/Roaming/wsltty/themes/solarized_dark
+      dest: '{{ wsl_appdata }}/wsltty/themes/solarized_dark'
     - url: 'https://maoudamashii.jokersounds.com/music/se/wav/se_maoudamashii_system41.wav'
-      dest: /mnt/{{ profile_drivename }}/Users/{{ win_user }}/AppData/Roaming/wsltty/sounds/beep.wav
+      dest: '{{ wsl_appdata }}/wsltty/sounds/beep.wav'
     wsl_conf: |-
       [automount]
       enabled = false
@@ -48,23 +48,26 @@
       - pip2
 
     - name: repositories added #workaround wsl ubuntu1804
-      shell: |-
-        for i in {{ item|regex_replace("^ppa:(.*?-.*?)\/.*", "\1") }}*;
-        do test ! -e "$i" || apt-add-repository {{ item }} -y
-        done
+      shell: >
+        creates=/etc/apt/sources.list.d/{{ item.split("/")[0][4:] }}*
+        apt-add-repository {{ item }} -y
       loop: '{{ ppas }}'
       register: _s
-      changed_when: _s.stderr|length > 0
+    - debug: var=_s
 
     - name: packages installed
-      package: >
+      apt: >
         name={{ item }}
+        update_cache=yes
       loop:
       - language-pack-ja
       - rsync
       - fish
       - neovim
       - p7zip-full
+      - unzip
+      - nkf
+      - skktools
 
     - name: python neovim packages installed
       pip: >
