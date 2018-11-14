@@ -1,0 +1,149 @@
+[[plugins]]
+repo = 'Shougo/vimproc.vim'
+build = 'make'
+
+[[plugins]]
+repo = 'Shougo/neocomplete.vim'
+if = "has('lua') && (v:version < 800 && !has('nvim') || !has('python3'))"
+on_event = ['InsertEnter']
+hook_add = '''
+  execute 'source ' . g:toml_dir . '/plugins/neco.rc.vim'
+'''
+
+[[plugins]]
+repo = 'Shougo/deoplete.nvim'
+if = "has('python3') && (v:version >= 800 || has('nvim'))"
+on_event = ['InsertEnter']
+hook_source = '''
+  execute 'source ' . g:toml_dir . '/plugins/deoplete.rc.vim'
+'''
+
+[[plugins]]
+repo = 'roxma/nvim-yarp'
+if = "has('python3') && (v:version >= 800 || has('nvim'))"
+on_event = ['InsertEnter']
+
+[[plugins]]
+repo = 'roxma/vim-hug-neovim-rpc'
+if = "has('python3') && (v:version >= 800 || has('nvim'))"
+on_event = ['InsertEnter']
+
+[[plugins]]
+repo = 'Shougo/neosnippet.vim'
+on_event = ['InsertEnter']
+on_ft = ['snippet']
+depends = ['neosnippet-snippets', 'context_filetype.vim']
+hook_source = '''
+  execute 'source ' . g:toml_dir . '/plugins/neosnippet.rc.vim'
+'''
+
+[[plugins]]
+repo = 'ujihisa/neco-look'
+on_event = ['InsertEnter']
+
+[[plugins]]
+repo = 'pocke/neco-gh-issues'
+on_event = ['InsertEnter']
+
+[[plugins]]
+repo = 'Shougo/neco-syntax'
+on_event = ['InsertEnter']
+
+[[plugins]]
+repo = 'rhysd/vim-operator-surround'
+on_map = {n = '<Plug>'}
+hook_add= '''
+  execute 'source ' . g:toml_dir . '/plugins/vim-operator-surround.rc.vim'
+'''
+
+[[plugins]]
+repo = 'zchee/deoplete-jedi'
+on_ft = 'python'
+if = "has('nvim')"
+depends = ['deoplete.nvim']
+
+[[plugins]]
+repo = 'davidhalter/jedi-vim'
+on_ft = 'python'
+if = "has('python3')"
+hook_source = '''
+  execute 'source ' . g:toml_dir . '/plugins/jedi-vim.rc.vim'
+'''
+hook_post_update = '''
+  call system('git submodule update --init')
+'''
+
+[[plugins]]
+repo = 'davidhalter/jedi-vim'
+on_ft = 'python'
+if = "!has('python3') && has('python') && has('lua')"
+hook_source = '''
+  execute 'source ' . g:toml_dir . '/plugins/jedi-vim_vim8.rc.vim'
+'''
+hook_post_update = '''
+  git submodule update --init
+'''
+
+[[plugins]]
+repo = 'scrooloose/nerdtree'
+on_cmd = ['NERDTreeToggle']
+on_map = ['<plug>NERDTreeTabsToggle', '<plug>NERDTreeTabsFind']
+depends = ['nerdtree-git-plugin', 'vim-nerdtree-tabs']
+hook_add = '''
+  execute 'source ' . g:toml_dir . '/plugins/nerdtree.rc.vim'
+'''
+
+[[plugins]]
+repo = 'tpope/vim-fugitive'
+on_cmd = [
+  'Git',
+  'Gcommit',
+  'Gstatus',
+  'Gdiff',
+  'Gblame',
+  'Glog'
+]
+hook_add = '''
+  execute 'source ' . g:toml_dir . '/plugins/vim-fugitive.rc.vim'
+'''
+
+[[plugins]]
+repo = 'thinca/vim-quickrun'
+depends = ['vimproc.vim']
+on_ft = ['python', 'go']
+hook_source = '''
+  execute 'source ' . g:toml_dir . '/plugins/vim-quickrun.rc.vim'
+'''
+
+[[plugins]]
+repo = 'w0rp/ale'
+if = "v:version >= 800 || has('nvim')"
+on_ft = ['go', 'python', 'javascript', 'html', 'css', 'markdown', 'make', 'vim']
+hook_source = '''
+  execute 'source ' . g:toml_dir . '/plugins/ale.rc.vim'
+'''
+
+[[plugins]]
+repo = 'jmcantrell/vim-virtualenv'
+
+[[plugins]]
+repo = 'Vimjas/vim-python-pep8-indent'
+on_ft = ['python']
+
+[[plugins]]
+repo = 'jsfaint/gen_tags.vim'
+on_ft = ['python', 'go', 'vim']
+hook_source = '''
+    let g:gen_tags#ctags_auto_gen = 1
+    let g:gen_tags#gtags_auto_gen = 0
+'''
+
+[[plugins]]
+repo = 'janko-m/vim-test'
+depends = ['vim-dispatch']
+hook_source = '''
+    let g:test#strategy = 'dispatch'
+'''
+
+[[plugins]]
+repo = 'tpope/vim-dispatch'

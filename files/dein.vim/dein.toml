@@ -1,0 +1,66 @@
+[[plugins]]
+repo = 'Shougo/dein.vim'
+
+[[plugins]]
+repo = 'Shougo/vimshell'
+if = "!has('nvim')"
+
+[[plugins]]
+repo ='Shougo/denite.nvim'
+if = "has('python3')"
+hook_post_source= '''
+  execute 'source ' . g:toml_dir . '/plugins/denite.rc.vim'
+'''
+
+[[plugins]]
+repo = 'itchyny/lightline.vim'
+hook_add = '''
+  execute 'source ' . g:toml_dir . '/plugins/lightline.rc.vim'
+'''
+
+[[plugins]]
+repo = 'airblade/vim-gitgutter'
+depends = ['dein.vim']
+hook_add = '''
+  execute 'source ' . g:toml_dir . '/plugins/vim-gitgutter.rc.vim'
+'''
+
+[[plugins]]
+repo = 'ujihisa/unite-colorscheme'
+
+[[plugins]]
+repo = 'taka-vagyok/term_forrest_cls.vim'
+
+[[plugins]]
+repo = 'altercation/vim-colors-solarized'
+
+[[plugins]]
+repo = 'Shougo/context_filetype.vim'
+
+[[plugins]]
+repo = 'Shougo/neosnippet-snippets'
+
+[[plugins]]
+repo = 'honza/vim-snippets'
+
+[[plugins]]
+repo = 'hirsaeki-mki/ansible-vim'
+
+[[plugins]]
+repo = 'kana/vim-operator-user'
+
+[[plugins]]
+repo = 'kannokanno/previm'
+hook_add = '''
+  let g:previm_open_cmd = 'firefox'
+  augroup PrevimSettings
+    autocmd!
+    autocmd BufNewFile,BufRead *.{md,mdwn,mkd,mkdn,mark*} set filetype=markdown
+  augroup END
+'''
+
+[[plugins]]
+repo = 'tpope/vim-markdown'
+
+[[plugins]]
+repo = 'vim-scripts/fcitx.vim'
