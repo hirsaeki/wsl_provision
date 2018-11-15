@@ -266,3 +266,21 @@
       dest={{ wsl_userprofile }}/SKKDICT
       src={{ item }}
     loop: '{{ lookup("fileglob", "files/skk*.txt", wantlist=True) }}'
+
+  - name: yamy config added
+    copy: >
+      src={{ item }}
+      dest={{ wsl_userprofile }}/opt/yamy/{{ item|basename|regex_replace("^dot", "") }}
+    loop: '{{ lookup("fileglob", "files/*.mayu", wantlist=True) }}'
+
+  - name: xdg cfg directory for copy created
+    file: >
+      state=directory
+      path={{ confhome }}/{{ item.path }}
+    loop: '{{ lookup("filetree", "files/dot.config")|json_query("[?state==`directory`]") }}'
+
+  - name: xdg cfg files copied
+    copy: >
+      src={{ item.src }}
+      dest={{ confhome }}/{{ item.path }}
+    loop: '{{ lookup("filetree", "files/dot.config")|json_query("[?state==`file`]") }}'

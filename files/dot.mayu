@@ -1,3 +1,4 @@
+#include "101.mayu" # 101 キーボード設定
 include "109.mayu" # 109 キーボード設定
 include "sands.mayu"
 include "vimedit.mayu"
