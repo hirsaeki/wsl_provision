@@ -13,8 +13,8 @@
     win_userprofile: >-
       {{ lookup('pipe', 'cmd.exe /c "echo %USERPROFILE%"') }}
     win_handyapps_root: '{{ win_userprofile }}\opt'
-    proxy_env: {}
-    __proxy_env:
+    __proxy_env: {}
+    proxy_env:
       http_proxy: http://150.67.140.80:3128
       https_proxy: http://150.67.140.80:3128
     handy_apps:
@@ -261,11 +261,11 @@
       skkdic-expr2 -o SKK-JISYO.utf8.union {{ lookup('pipe', 'echo *.utf8').split()|join(" + ") }}
     when: _skkdict is changed
 
-  - name: skk kana maps copied
+  - name: skk config template copied
     copy: >
-      dest={{ wsl_userprofile }}/SKKDICT
+      dest={{ wsl_userprofile }}/AppData/Roaming/CorvusSKK
       src={{ item }}
-    loop: '{{ lookup("fileglob", "files/skk*.txt", wantlist=True) }}'
+    loop: '{{ lookup("fileglob", "files/corvusskk_config_*.xml", wantlist=True) }}'
 
   - name: yamy config added
     copy: >
@@ -273,7 +273,7 @@
       dest={{ wsl_userprofile }}/opt/yamy/{{ item|basename|regex_replace("^dot", "") }}
     loop: '{{ lookup("fileglob", "files/*.mayu", wantlist=True) }}'
 
-  - name: xdg cfg directory for copy created
+  - name: xdg cfg directory for copy config created
     file: >
       state=directory
       path={{ confhome }}/{{ item.path }}
