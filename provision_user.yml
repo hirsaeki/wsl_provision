@@ -4,7 +4,7 @@
   hosts: localhost
   connection: local
   vars:
-    profile_drivename: d
+    profile_drivename: '{{ lookup("pipe","cmd.exe /c ""echo %USERPROFILE:~,1%""")|lower }}'
     wsl_user: '{{ ansible_env.LOGNAME }}'
   tasks:
     - name: dir for wsl home created
@@ -23,4 +23,3 @@
         state=present
       register: _mount
     - debug: var=_mount verbosity=1
-

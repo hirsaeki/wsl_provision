@@ -10,7 +10,9 @@
       http_proxy: http://150.67.140.80:3128
       https_proxy: http://150.67.140.80:3128
       APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE: DontWarn
-    win_drives: '{{ lookup("pipe", "mount | awk ''/^[a-z]:/ {print $1}'' | sort | uniq").splitlines() }}'
+    win_drives: |-
+      {% set ps = 'powershell.exe -c "(GET-WMIOBJECT -query \\"SELECT * from win32_logicaldisk where DriveType =''3''\\").DeviceID"|tr "[:upper:]" "[:lower:]"|tr -d ":"' %}
+      {{ lookup('pipe', ps).splitlines() }}
     wsl_appdata: '{{ lookup("pipe", "wslpath \"%s\"" % ansible_env.APPDATA) }}'
     wsl_user: '{{ ansible_env.LOGNAME }}'
     ppas:
@@ -29,6 +31,8 @@
       Asia/Tokyo
 
   tasks:
+  - debug: var=win_drives
+  - fail:
   - name: superuser tasks
     block:
     - name: aptitude added
