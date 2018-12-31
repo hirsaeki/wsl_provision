@@ -2,14 +2,14 @@
 # -*- coding: euc-jp -*-
 # http://rubyist.g.hatena.ne.jp/znz/20060924/p1
 #
-# ã¯ã¦ãªãƒ€ã‚¤ã‚¢ãƒªãƒ¼ã‚­ãƒ¼ãƒ¯ãƒ¼ãƒ‰ãµã‚ŠãŒãªãƒªã‚¹ãƒˆã‚’SKKã®è¾æ›¸ã«å¤‰æ›
+# ¤Ï¤Æ¤Ê¥À¥¤¥¢¥ê¡¼¥­¡¼¥ï¡¼¥É¤Õ¤ê¤¬¤Ê¥ê¥¹¥È¤òSKK¤Î¼­½ñ¤ËÊÑ´¹
 #
-# ä½¿ã„æ–¹:
+# »È¤¤Êı:
 #  wget http://d.hatena.ne.jp/images/keyword/keywordlist_furigana.csv
 #  ruby keywordlist_furigana2skkdic.rb keywordlist_furigana.csv > tmp.skkdic
 #  skkdic-expr2 -o keywordlist_furigana.skkdic tmp.skkdic
 #
-# åŒä¸€ã®èª­ã¿ã‚’ã¾ã¨ã‚ãŸã‚Šã¯ã—ã¦ã„ãªã„ã®ã§ã€ä¸€åº¦skkdic-expr2ã‚’é€šã—ã¦ãã ã•ã„ã€‚
+# Æ±°ì¤ÎÆÉ¤ß¤ò¤Ş¤È¤á¤¿¤ê¤Ï¤·¤Æ¤¤¤Ê¤¤¤Î¤Ç¡¢°ìÅÙskkdic-expr2¤òÄÌ¤·¤Æ¤¯¤À¤µ¤¤¡£
 #
 #
 # License:
@@ -40,7 +40,7 @@ class String
   # borrowed from http://openlab.jp/skk/skk/tools/filters/skkdictools.rb
   def concatify
     #if !(/^([-\w]+.*)$/ =~ self) && (/[;\r\n\/\"]/ =~ self)
-    # []ã®å‡¦ç†ã‚’ã—ãªã„ã¨skkdic-expr2ãŒSEGVã‚‹ã€‚
+    # []¤Î½èÍı¤ò¤·¤Ê¤¤¤Èskkdic-expr2¤¬SEGV¤ë¡£
     # see http://d.hatena.ne.jp/rubikitch/20091022/1256186001
     if /[\[\];\r\n\/\"]/ =~ self
       tmp = self.gsub(/;/, '\\\073').gsub(/\//, '\\\057').gsub(/\r/, '\\r').gsub(/\n/, '\\n').gsub(/"/, '\\"').gsub(/[\[\]]/, '')
@@ -57,13 +57,13 @@ ARGF.each do |line|
   line.chomp!
   furigana, keyword = line.split(/\t/, 2)
   if furigana.empty?
-    next # ãµã‚ŠãŒãªãŒãªã„ã‚­ãƒ¼ãƒ¯ãƒ¼ãƒ‰ã‚’ç„¡è¦–
+    next # ¤Õ¤ê¤¬¤Ê¤¬¤Ê¤¤¥­¡¼¥ï¡¼¥É¤òÌµ»ë
   end
   if furigana == keyword
-    next # ã²ã‚‰ãŒãªã ã‘ã®ã‚­ãƒ¼ãƒ¯ãƒ¼ãƒ‰ã‚’ç„¡è¦–
+    next # ¤Ò¤é¤¬¤Ê¤À¤±¤Î¥­¡¼¥ï¡¼¥É¤òÌµ»ë
   end
   if furigana == NKF.nkf('-Ee -m0 --hiragana', keyword)
-    next # ã‚«ã‚¿ã‚«ãƒŠèªã¯ç„¡è¦–
+    next # ¥«¥¿¥«¥Ê¸ì¤ÏÌµ»ë
   end
   puts "#{furigana} /#{keyword.gsub(/&amp;/, '&').concatify}/"
 end

@@ -31,8 +31,6 @@
       Asia/Tokyo
 
   tasks:
-  - debug: var=win_drives
-  - fail:
   - name: superuser tasks
     block:
     - name: aptitude added

@@ -16,11 +16,13 @@
     proxy_env:
       http_proxy: '{{ ansible_env.http_proxy|default("") }}'
       https_proxy: '{{ ansible_env.https_proxy|default("") }}'
+    fishers:
+    - oh-my-fish/theme-agnoster
     handy_apps:
     - src: https://github.com/nathancorvussolis/crvskkserv/releases/download/2.2.0/crvskkserv-2.2.0.zip 
       name: crvskkserv
       startup: yes
-    - src: https://portableapps.com/redirect/?a=PortableApps.comPlatform&s=s&d=pa&f=PortableApps.com_Platform_Setup_15.0.2.paf.exe
+    - src: https://portableapps.com/redirect/?a=PortableApps.comPlatform&s=s&d=pa&f=PortableApps.com_Platform_Setup_16.0.paf.exe
       name: portableAppsPlatform
       executable: Start.exe
       startup: yes
@@ -39,7 +41,7 @@
       {{ lookup('pipe', 'wslpath "%s"' % win_userprofile) }}
     wsl_handyapps_root: >-
       {{ lookup('pipe', 'wslpath "%s"' % win_handyapps_root) }}
-    confhome: '{{ ansible_env.XGD_CONFIG_HOME|default("~/.config") }}'
+    confhome: '{{ ansible_env.XDG_CONFIG_HOME|default("~/.config") }}'
     confs_from_git:
     - repo: https://github.com/mavnn/mintty-colors-solarized
       dest: mintty/solarized
@@ -50,8 +52,6 @@
       eval (dircolors -c {{ confhome }}/dircolors/solarized/dircolors.256dark)
       alias vi=nvim
       alias vim=nvim
-      stty stop undef
-      stty start undef
     font_sources:
     - https://github.com/mzyy94/RictyDiminished-for-Powerline/blob/master/powerline-fontpatched/Ricty Diminished Bold Oblique for Powerline.ttf
     - https://github.com/mzyy94/RictyDiminished-for-Powerline/blob/master/powerline-fontpatched/Ricty Diminished Bold for Powerline.ttf
@@ -69,7 +69,8 @@
       $link.TargetPath = "%(sc_target)s";
       $link.Save();'
     skkdict_sources:
-    - http://openlab.jp/skk/dic/SKK-JISYO.L.gz
+    - https://github.com/skk-users-jp/dic-mirror/raw/gh-pages/SKK-JISYO.L
+    # - http://openlab.jp/skk/dic/SKK-JISYO.L.gz
     - http://d.hatena.ne.jp/images/keyword/keywordlist_furigana.csv
 
   tasks:
@@ -77,21 +78,36 @@
     shell: >
       executable=/usr/bin/fish
       creates={{ confhome }}/fish/functions/fisher.fish
-      curl https://git.io/fisher --create-dirs -sLo {{ confhome }}/fish/functions/fisher.fish; and
-      fisher up
+      curl https://git.io/fisher --create-dirs -sLo {{ confhome }}/fish/functions/fisher.fish
     environment: '{{ proxy_env }}'
 
-  - name: install agnoster
+  - name: install fish plugins
     shell: >
       executable=/usr/bin/fish
-      fisher ls| grep hauleth/agnoster; or fisher add hauleth/agnoster
+      fisher ls| grep {{ item }}; or fisher add {{ item }} 
     environment: '{{ proxy_env }}'
+    register: _r
+    failed_when: _r.rc not in [0, 1]
+    changed_when: _r.rc == 1
+    loop: '{{ fishers }}'
 
   - name: xdg config dirs created
     file: >
       path={{ confhome }}/{{ item.dest }}
       state=directory
     loop: '{{ confs_from_git }}'
+
+  - name: xdg cfg directory for copy config created
+    file: >
+      state=directory
+      path={{ confhome }}/{{ item.path }}
+    loop: '{{ lookup("filetree", "files/dot.config")|json_query("[?state==`directory`]") }}'
+
+  - name: xdg cfg files copied
+    copy: >
+      src={{ item.src }}
+      dest={{ confhome }}/{{ item.path }}
+    loop: '{{ lookup("filetree", "files/dot.config")|json_query("[?state==`file`]") }}'
 
   - name: color schemes cloned
     git: >
@@ -116,7 +132,8 @@
       executable=/usr/bin/fish
       contains /home/{{ ansible_env.LOGNAME }}/bin $fish_user_paths; or set -U fish_user_paths ~/bin $fish_user_paths
     register: _r
-    changed_when: no
+    failed_when: _r.rc not in [0, 1]
+    changed_when: _r.rc == 1
   - debug: var=_r verbosity=1
 
   - name: handy apps folder created
@@ -248,7 +265,7 @@
   - name: skk utf8 hatena dict created
     shell: >
       chdir={{ wsl_userprofile }}/SKKDICT
-      ruby.exe {{ _copy.src|basename }} {{ item|basename }} | nkf -w -Lu > SKK-JISYO.hatena.utf8
+      ruby.exe -Ke {{ _copy.dest|basename }} {{ item|basename }} | nkf -w -Lu > SKK-JISYO.hatena.utf8
     loop: '{{ _skkdict|json_query("results[?changed].dest") }}'
     when:
     - item is search("\.csv$")
@@ -271,14 +288,3 @@
       dest={{ wsl_userprofile }}/opt/yamy/{{ item|basename|regex_replace("^dot", "") }}
     loop: '{{ lookup("fileglob", "files/*.mayu", wantlist=True) }}'
 
-  - name: xdg cfg directory for copy config created
-    file: >
-      state=directory
-      path={{ confhome }}/{{ item.path }}
-    loop: '{{ lookup("filetree", "files/dot.config")|json_query("[?state==`directory`]") }}'
-
-  - name: xdg cfg files copied
-    copy: >
-      src={{ item.src }}
-      dest={{ confhome }}/{{ item.path }}
-    loop: '{{ lookup("filetree", "files/dot.config")|json_query("[?state==`file`]") }}'

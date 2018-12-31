@@ -1,0 +1,13 @@
+---
+
+- name: provision shell and environment
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: test
+    shell: >
+      executable=/usr/bin/fish
+      contains /home/hsaeki/bin $fish_user_paths; or set -U fish_user_paths /home/hsaeki/bin $fish_user_paths
+    failed_when: _r.rc not in [0, 1]
+    changed_when: _r.rc == 1
+    register: _r
