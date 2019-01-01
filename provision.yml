@@ -15,8 +15,9 @@
       {{ lookup('pipe', ps).splitlines() }}
     wsl_appdata: '{{ lookup("pipe", "wslpath \"%s\"" % ansible_env.APPDATA) }}'
     wsl_user: '{{ ansible_env.LOGNAME }}'
+    profile_path: '{{ lookup("pipe","wslpath $(cmd.exe /c ""echo"" ""%USERPROFILE%"")") }}/wslhome'
     ppas:
-    - ppa:fish-shell/release-2
+    - ppa:fish-shell/release-3
     - ppa:neovim-ppa/unstable
     wsltty_items:
     - url: 'https://raw.githubusercontent.com/mavnn/mintty-colors-solarized/master/.minttyrc.dark'
@@ -31,6 +32,7 @@
       Asia/Tokyo
 
   tasks:
+  - debug: var=/
   - name: superuser tasks
     block:
     - name: aptitude added
@@ -104,6 +106,17 @@
         src='{{ item }}:'
         fstype=drvfs
         opts='metadata,umask=22,fmask=11,uid=1000,gid=1000'
+        state=present
+      register: _mount
+      loop: '{{ win_drives }}'
+    - debug: var=_mount verbosity=1
+
+    - name: bind mount home in userprofile
+      mount: >
+        path=/home/{{ wsl_user }}
+        src={{ profile_path }}
+        fstype=bind
+        opts='none'
         state=present
       register: _mount
       loop: '{{ win_drives }}'
