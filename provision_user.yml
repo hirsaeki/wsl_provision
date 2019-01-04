@@ -4,12 +4,12 @@
   hosts: localhost
   connection: local
   vars:
-    profile_drivename: '{{ lookup("pipe","cmd.exe /c ""echo %USERPROFILE:~,1%""")|lower }}'
     wsl_user: '{{ ansible_env.LOGNAME }}'
+    profile_path: '{{ lookup("pipe","wslpath $(cmd.exe /c ""echo"" ""%USERPROFILE%"")") }}/wslhome'
   tasks:
   - name: dir for wsl home created
     file: >
-      path=/mnt/{{ profile_drivename }}/Users/{{ wsl_user }}/wslhome
+      path={{ profile_path }}/wslhome
       state=directory
       owner={{ wsl_user }}
       group={{ wsl_user }}
@@ -17,7 +17,7 @@
   - name: user home in fstab updated for bind mount in fstab
     mount: >
       path=/home/{{ wsl_user }}
-      src=/mnt/{{ profile_drivename }}/Users/{{ wsl_user }}/wslhome
+      src={{ profile_path }}/wslhome
       fstype=none
       opts=bind
       state=present

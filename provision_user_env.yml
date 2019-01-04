@@ -22,7 +22,9 @@
     - src: https://github.com/nathancorvussolis/crvskkserv/releases/download/2.2.0/crvskkserv-2.2.0.zip 
       name: crvskkserv
       startup: yes
-    - src: https://portableapps.com/redirect/?a=PortableApps.comPlatform&s=s&d=pa&f=PortableApps.com_Platform_Setup_16.0.paf.exe
+    - 
+      #  src: https://portableapps.com/redirect/?a=PortableApps.comPlatform&s=s&d=pa&f=PortableApps.com_Platform_Setup_16.0.paf.exe
+      src: https://portableapps.com/redirect/?a=PortableApps.comPlatform&s=s&d=pa&n=The%20PortableApps.com%20Platform&f=PortableApps.com_Platform_Setup_16.0.paf.exe
       name: portableAppsPlatform
       executable: Start.exe
       startup: yes
@@ -35,12 +37,15 @@
     - src: https://ftp.postgresql.org/pub/odbc/versions/dll/psqlodbc_10_03_0000-x64.zip
       name: psqlodbc64
       reg_startmenu: no
-    papp_data_path: >-
-      {{ lookup('pipe', 'wslpath "%s"' % win_handyapps_root)}}/portableAppsPlatform/PortableApps/PortableApps.com/Data
     wsl_userprofile: >-
       {{ lookup('pipe', 'wslpath "%s"' % win_userprofile) }}
     wsl_handyapps_root: >-
       {{ lookup('pipe', 'wslpath "%s"' % win_handyapps_root) }}
+    papp_root: '{{ wsl_handyapps_root }}/portableAppsPlatform/PortableApps/PortableApps.com'
+    papp_updater_dir: Updater
+    papp_updater: PortableAppsUpdater.exe
+    papp_font_dir: Data/Fonts
+    papp_ini: Data/PortableAppsMenu.ini
     confhome: '{{ ansible_env.XDG_CONFIG_HOME|default("~/.config") }}'
     confs_from_git:
     - repo: https://github.com/mavnn/mintty-colors-solarized
@@ -69,7 +74,8 @@
       $link.TargetPath = "%(sc_target)s";
       $link.Save();'
     skkdict_sources:
-    - https://github.com/skk-users-jp/dic-mirror/raw/gh-pages/SKK-JISYO.L
+    - https://github.com/skk-dev/dict/raw/master/SKK-JISYO.L
+    # - https://github.com/skk-users-jp/dic-mirror/raw/gh-pages/SKK-JISYO.L
     # - http://openlab.jp/skk/dic/SKK-JISYO.L.gz
     - http://d.hatena.ne.jp/images/keyword/keywordlist_furigana.csv
 
@@ -201,33 +207,43 @@
         sc_target: '{{ win_handyapps_root }}\\{{ item.name }}\\{{ item.executable|default(item.name ~ ".exe") }}'
     loop: '{{ handy_apps|json_query("[?startup]") }}'
       
-  - name: Fonts dir created
+  - name: papp addtional dir created
     shell: >
-      creates={{ papp_data_path }}/Fonts
-      cmd.exe /c "mkdir" "{{ winpath }}"
+      creates={{ dest }}
+      cmd.exe /c "mkdir" "{{ lookup('pipe', 'wslpath -w ""%s""' % dest) }}"
     register: _r
     vars:
-      winpath: >-
-        {{ lookup('pipe', 'wslpath -w "%s/Fonts"' % papp_data_path) }}
+      dest: '{{ papp_root }}/{{ item }}'
+    loop:
+    - '{{ papp_font_dir }}'
+    - '{{ papp_updater_dir }}'
   - debug: var=_r verbosity=1
 
   - name: download fonts
     get_url: >
-      dest={{ papp_data_path }}/Fonts/{{ item|urlsplit('path')|basename }}
+      dest={{ dest }}/{{ item|urlsplit('path')|basename }}
       url={{ item|replace(" ", "%20") }}?raw=true
     loop: '{{ font_sources }}'
     register: _font
     environment: '{{ proxy_env }}'
+    vars:
+      dest: '{{ papp_root }}/{{ papp_font_dir }}'
     until: _font is succeeded
   - debug: var=_font verbosity=1
 
   - name: portableApps ini updated for taskbar icon hiding
     ini_file: >
       section=DisplayOptions
-      path={{ papp_data_path }}/PortableAppsMenu.ini
+      path={{ papp_root }}/Data/PortableAppsMenu.ini
       option=Windows7TaskbarIcon
       no_extra_spaces=yes
       value='false'
+
+  - name: portableApps updater moved
+    shell: >
+      creates={{ papp_root }}/{{ papp_updater_dir }}/{{ papp_updater }}
+      chdir={{ papp_root }}
+      mv {{ papp_updater }} {{ papp_updater_dir }}
 
   - name: skk dict dir created
     shell: >
@@ -255,12 +271,21 @@
     register: _copy
   - debug: var=_copy verbosity=1
 
-  - name: skk utf8 dict created
+  - name: skk utf8 dict created (.gz)
     shell: >
       zcat {{ item }} | nkf -w -Lu > {{ item|regex_replace("\.gz$", "") }}.utf8
     loop: '{{ _skkdict|json_query("results[?changed].dest") }}'
     when:
+    - item is search("SKK-JISYO")
     - item is search("\.gz$")
+
+  - name: skk utf8 dict created (flat)
+    shell: >
+      cat {{ item }} | nkf -w -Lu > {{ item }}.utf8
+    loop: '{{ _skkdict|json_query("results[?changed].dest") }}'
+    when:
+    - item is search("SKK-JISYO")
+    - item is not search("\.gz$")
 
   - name: skk utf8 hatena dict created
     shell: >
@@ -287,4 +312,3 @@
       src={{ item }}
       dest={{ wsl_userprofile }}/opt/yamy/{{ item|basename|regex_replace("^dot", "") }}
     loop: '{{ lookup("fileglob", "files/*.mayu", wantlist=True) }}'
-
